@@ -21,9 +21,9 @@
 
 #define ESPLED D4       // 2
 #define PCBLED D0       // 16 , LED_BUILTIN
-#define ROAD_LED D5
+#define ROAD_LED D7
 
-#define REED_SENSOR D8
+#define REED_SENSOR D5
 
 
 char access_SSID[] = ACCESS_POINT_SSID;
@@ -34,28 +34,35 @@ const unsigned long interval_LED                = 1000;
 const unsigned long interval_DHT11              = 5000;
 const unsigned long interval_minimum_revolution = 2500;
 const unsigned long interval_ThingSpeakUpload   = 15000;
+const unsigned long interval_DataCalculator     = 500;
 
-unsigned long lastRevolutionTime    = 0;
-unsigned long lastLEDblinkTime      = 0;
-unsigned long lastUploadTime        = 0;
-unsigned long lastDHT11Time         = 0;
+unsigned long lastDataCalculatedTime    = 0;
+unsigned long preLastRevolutionTime     = 0;
+unsigned long lastRevolutionTime        = 0;
+unsigned long lastLEDblinkTime          = 0;
+unsigned long lastUploadTime            = 0;
+unsigned long lastDHT11Time             = 0;
 
 
-const wheel_radius = 40;            // in CM
+const int wheel_radius                  = 34;       // in CM
+const float kWh_per_revolution          = 0.3;
 
 float humidity;
 float temperature;
 
-bool underOperation = false;
+bool underOperation                     = false;
 
-int data_rpm                    = 0;
-int data_usageTime              = 0;
-unsigned long startTime         = 0;
-unsigned long stopTime          = 0;
-int calc_bicycleSpeed;          = 0;    // average (total distance / usage time) OR momentary (rpm to kpm)
-int calc_energyProduced         = 0;
-int calc_distanceTravelled;     = 0;    // we need total rpm per ride
-unsigned long rideRevolutions   = 0;
+
+int usageSeconds                        = 0;
+int rpm                                 = 0;
+int bicycleSpeed                        = 0;        // average (total distance / usage time) OR momentary (rpm to kpm)
+int energyProduced                      = 0;
+int distanceTravelled                   = 0;        // we need total rpm per ride
+unsigned long rideRevolutions           = 0;
+
+unsigned long startTime                 = 0;
+unsigned long stopTime                  = 0;
+unsigned long revolutionDurationMS      = 0;
 
 
 // Software serial used to communicate with 2nd ESP8266 (internet_relay)
@@ -67,22 +74,22 @@ DHT dht(DHTPIN, DHTTYPE);
 
 
 float circumference_CM(int radiusCM) {                                          // output in CM
-    return 2.0 * M_PI * radius;
+    return 2.0 * M_PI * radiusCM;
+}
+
+
+int revolutions_per_minute_RPM(int timeSEC, float circumferenceCM) {        // na vlepei time "between revolutions" (na to upologisw) 
+    return (int(circumferenceCM) * 60) / timeSEC;                                                              // kai na kanei ta millis se RPM (xrono) (vasei circumference)
 }
 
 
 float kilometers_per_hour(int rpm, float circumferenceCM) {
-    return circumference * rpm * 60.0 / 1000.0;
+    return circumferenceCM * rpm * 60.0 / 1000.0;
 }
 
 
 int usage_seconds(unsigned long startMILLIS, unsigned long stopMILLIS) {
-    return (stop - start) / 1000;
-}
-
-
-float distance_travelled_KM(unsigned long totalRev, float circumferenceCM) {    // output in KM
-    return totalRev * circumference / 1000.0;
+    return (stopMILLIS - startMILLIS) / 1000;
 }
 
 
@@ -91,23 +98,90 @@ float average_speed_KPH(float distanceKM, int timeSEC) {                        
 }
 
 
-// interrupt handler
-void revolution() {
-    lastRevolutionTime = millis();
-    if (millis() < lastRevolutionTime + interval_minimum_revolution) {
-        rideRevolutions += 1;
-        underOperation = true;
-    }
+float distance_travelled_KM(unsigned long totalRev, float circumferenceCM) {    // output in KM
+    return totalRev * circumferenceCM / 1000.0;
 }
 
+
+float energy_produced_KWH(int rpm, float kwhPerRpm) {
+    return rpm * kwhPerRpm;
+}
+
+
+void calculate_data() {
+    revolutionDurationMS    = lastRevolutionTime - preLastRevolutionTime;
+    unsigned long revolutionDurationSEC = revolutionDurationMS / 1000;
+
+    usageSeconds        = (stopTime - startTime) / 1000;
+    // rpm                 = revolutions_per_minute_RPM(revolutionDurationSEC, circumference_CM(wheel_radius));
+    // bicycleSpeed        = kilometers_per_hour(rpm, circumference_CM(wheel_radius));
+    // energyProduced      = energy_produced_KWH(rpm, kWh_per_revolution);
+    // distanceTravelled   = distance_travelled_KM(rideRevolutions, circumference_CM(wheel_radius));
+}
+
+
+ICACHE_RAM_ATTR void revolution() {                         // interrupt handler
+
+    preLastRevolutionTime = lastRevolutionTime;
+
+    // IF last revolution was more than 'interval_minimum_revolution' (2.5") time ago
+    // AND currently is NOT under operation THEN --> consider NOW as 'startTime'
+    if ((millis() > lastRevolutionTime + interval_minimum_revolution) && !underOperation) {
+
+        rideRevolutions = 0;        // reset revolutions counter
+        startTime = millis();
+    }
+
+    underOperation = true;
+    rideRevolutions += 1;
+
+    lastRevolutionTime = millis();
+}
+
+
+void get_sensorData() {
+    temperature = dht.readTemperature();
+    humidity = dht.readHumidity();
+
+    Serial.print("Temperature: ");
+    Serial.print(String(temperature));
+    Serial.println(" °C");
+    Serial.print("Humidity: ");
+    Serial.print(String(humidity));
+    Serial.println(" %");
+
+    Serial.print("\nrevolutionDurationMS: ");
+    Serial.print(String(revolutionDurationMS));
+    Serial.println(" MS");
+
+    Serial.print("usageSeconds: ");
+    Serial.print(String(usageSeconds));
+    Serial.println(" sec");
+
+    Serial.print("rpm: ");
+    Serial.print(String(rpm));
+    Serial.println(" rpm");
+
+    Serial.print("bicycleSpeed: ");
+    Serial.print(String(bicycleSpeed));
+    Serial.println(" kph");
+
+    Serial.print("energyProduced: ");
+    Serial.print(String(energyProduced));
+    Serial.println(" kWh");
+
+    Serial.print("distanceTravelled: ");
+    Serial.print(String(distanceTravelled));
+    Serial.println(" KM");
+}
 
 
 void setup() {
     pinMode(ESPLED, OUTPUT);
     pinMode(PCBLED, OUTPUT);
     pinMode(ROAD_LED, OUTPUT);
-    pinMode(REED_SENSOR, INPUT);
-    attachInterrupt(digitalPinToInterrupt(REED_SENSOR), revolution, CHANGE);
+    pinMode(REED_SENSOR, INPUT_PULLUP);
+    attachInterrupt(digitalPinToInterrupt(REED_SENSOR), revolution, FALLING);
 
     digitalWrite(ESPLED, HIGH);
     digitalWrite(PCBLED, HIGH);
@@ -119,19 +193,12 @@ void setup() {
     Serial_internet_relay.begin(9600);                    // serial with "internet_relay"
     delay(200);
 
-    WiFi.mode(WIFI_AP);
+    // WiFi.mode(WIFI_AP);
     WiFi.softAP(access_SSID, access_PASS);
 
     IPAddress myIP = WiFi.softAPIP();
     Serial.print("\n[SUCCESS] HotSpot IP : ");
     Serial.println(myIP);
-
-    // if (WiFi.waitForConnectResult() != WL_CONNECTED) {
-    //     Serial.println("[ERROR] connecting on WiFi. System will reboot in 5\" ...");
-    //     Serial_internet_relay.println("[ERROR] connecting on WiFi. System will reboot in 5\" ...");
-    //     delay(5000);
-    //     ESP.restart();
-    // }
 
     server.on("/", onConnect_default);
     server.on("/restart", onConnect_restart);
@@ -152,14 +219,147 @@ void setup() {
 void loop() {
     server.handleClient();
 
-    if (millis() < lastRevolutionTime + interval_minimum_revolution) {
+    if ((millis() > lastRevolutionTime + interval_minimum_revolution) && underOperation) {
         underOperation = false;
+        stopTime = millis();
+        // Serial.println("[DEB] underOperation=false");
     }
-    
+
+    if (underOperation) {
+
+        if (millis() > lastDataCalculatedTime + interval_DataCalculator) {
+            calculate_data();
+        }
+
+        digitalWrite(PCBLED, LOW);
+    }
+    else {
+        // more stuff
+        digitalWrite(PCBLED, HIGH);
+    }
 }
 
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ HTML code ~~~~~~~~~~~~~~~~~~~~~~~
+String HTML_LANDING_PAGE() {
+    String html_page = "<!DOCTYPE html> <html>\n";
+    html_page += "<meta http-equiv=\"refresh\" content=\"2\" >\n";
+    html_page += "<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, user-scalable=no\">\n";
+    html_page += "<link rel=\"icon\" href=\"data:,\">\n";
+    html_page += "<title>BikeCharger</title>\n";
+    html_page += "<style>\n";
+    html_page += "html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: center; }\n";
+    html_page += "body { margin-top: 50px; color: white; background: black;}\n";
+    // html_page += "h1 { color: #B4F9F3; margin: 50px auto 30px; }\n";
+    html_page += "p { font-size: 24px; }\n";
+    // html_page += "p { font-size: 24px; color: #B4F9F3; margin-bottom: 10px; }\n";
+    // html_page += "table, table td { border: 0px solid #cccccc; }\n";
+    html_page += "table, table td { text-align: center; vertical-align: middle; padding-top: 5px; padding-bottom: 5px; }\n";
+    // html_page += ".button { background-color: #195B6A; border: none; color: white; padding: 16px 50px;\n";
+    // html_page += ".button { background-color: #195B6A; border: none; color: white; padding: 16px 50px; text-decoration: none; text-align: center; font-size: 30px; margin: 2px; cursor: pointer; }\n";
+    // html_page += ".button { background-color: #195B6A; border: none; color: white; height: 50px; width: 130px;\n";
+    html_page += ".button { background-color: #195B6A; border: none; color: white; height: 50px; width: auto;\n";
+    html_page += "text-decoration: none; text-align: center; font-size: 20px; margin: 2px; cursor: pointer; }\n";
+    html_page += ".button2 { background-color: #77878A; }\n";
+    html_page += ".button3 { background-color: #ff3300; }\n";
+
+    html_page += "</style>\n";
+    html_page += "</head>\n";
+
+    html_page += "<body>\n";
+    html_page += "<div id=\"webpage\">\n";
+    html_page += "<h1>BikeCharger</h1>\n";
+    html_page += "<br />\n";
+    html_page += "<h2>Current Ride</h2>\n";
+    // html_page += "<br />\n";
+
+    html_page += "<table style=\"margin-left:auto; margin-right:auto; allign:center; font-size:20px\">\n";
+
+    html_page += "<tr>\n";
+    html_page += "<td>Temperature:</td>";
+    html_page += "<td style=\"padding-left: 10px;\">";
+    html_page += (String)temperature;
+    html_page += " &#176C</td>";                            // '°' is '&#176' in HTML
+    html_page += "</tr>\n";
+
+    html_page += "<tr>\n";
+    html_page += "<td>Humidity:</td>";
+    html_page += "<td style=\"padding-left: 10px;\">";
+    html_page += (String)humidity;
+    html_page += " %</td>";
+    html_page += "</tr>\n";
+
+    html_page += "</table>\n";
+
+    html_page += "<br />\n";
+
+
+    html_page += "<table style=\"margin-left:auto; margin-right:auto; allign:center; font-size:20px\">\n";
+
+    html_page += "<tr>\n";
+    html_page += "<td>Speed:</td>";
+    html_page += "<td style=\"padding-left: 10px;\">";
+    html_page += (String)rpm;
+    html_page += " rpm</td>";
+    html_page += "</tr>\n";
+
+    html_page += "<tr>\n";
+    html_page += "<td>Speed:</td>";
+    html_page += "<td style=\"padding-left: 10px;\">";
+    html_page += (String)bicycleSpeed;
+    html_page += " kph</td>";
+    html_page += "</tr>\n";
+
+    html_page += "<tr>\n";
+    html_page += "<td>Distance:</td>";
+    html_page += "<td style=\"padding-left: 10px;\">";
+    html_page += (String)distanceTravelled;
+    html_page += " km</td>";
+    html_page += "</tr>\n";
+
+    html_page += "<tr>\n";
+    html_page += "<td>Energy produced:</td>";
+    html_page += "<td style=\"padding-left: 10px;\">";
+    html_page += (String)energyProduced;
+    html_page += " kWh</td>";
+    html_page += "</tr>\n";
+
+    html_page += "<tr>\n";
+    // html_page += "<td colspan=\"2\"><p><a href=\"/settings\"><button class=\"button\">SETTINGS</button></a></p></td>";
+    html_page += "<td colspan=\"2\"><a href=\"/settings\"><button class=\"button\">SETTINGS</button></a></td>";
+    html_page += "</tr>\n";
+
+    html_page += "</table>\n";
+
+    html_page += "<br />\n";
+
+    html_page += "</div>\n";
+    html_page += "</body>\n";
+    html_page += "</html>\n";
+
+    return html_page;
+}
+
+String HTML_SETTINGS_PAGE() {
+    String html_page = "<!DOCTYPE html> <html>\n";
+    html_page += "<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, user-scalable=no\">\n";
+    html_page += "<title>RJD Monitor</title>\n";
+    html_page += "<style>html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: left;}\n";
+    html_page += "body{margin-top: 50px;} h1 {color: #444444;margin: 50px auto 30px;}\n";
+    html_page += "p {font-size: 24px;color: #444444;margin-bottom: 10px;}\n";
+    html_page += "</style>\n";
+    html_page += "</head>\n";
+    html_page += "<body>\n";
+    html_page += "<div id=\"webpage\">\n";
+    html_page += "<h1>SETTINGS</h1>\n";
+    html_page += "<p>Under construction</p>";
+    html_page += "</div>\n";
+    html_page += "</body>\n";
+    html_page += "</html>\n";
+
+    return html_page;
+}
+
 String HTML_REFRESH_TO_SETTINGS() {
     String html_page = "<HEAD>";
     html_page += "<meta http-equiv=\"refresh\" content=\"0;url=/settings\">";
@@ -206,8 +406,7 @@ void onConnect_default() {
 }
 
 void onConnect_settings() {
-    digitalWrite(ESPLED, LOW);}
-    get_sensorData();
+    digitalWrite(ESPLED, LOW);
     server.send(200, "text/html", HTML_SETTINGS_PAGE());
     digitalWrite(ESPLED, HIGH);
 }

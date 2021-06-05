@@ -20,6 +20,8 @@ The microcontroller creates a local WiFi hotspot. Connection details:
 
 When a user wants to operate the bicycle, they should connect on the above-mentioned hotspot in order to be able to see their data.
 
+<br>
+
 ### Data collected
 
 | NAME | UNIT |
@@ -29,11 +31,13 @@ When a user wants to operate the bicycle, they should connect on the above-menti
 |Wheel speed|rpm|
 |Usage time|sec|
 
+<br>
+
 ### Data calculated
 
 | NAME | UNIT |
 |:---:|:---:|
-|Bicycle speed|kph|
+|Bicycle speed (avg)|kph|
 |Distance travelled|km|
 |Energy produced|kWh|
 
