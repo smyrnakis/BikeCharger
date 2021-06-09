@@ -55,6 +55,7 @@ When a user wants to operate the bicycle, they should connect on the above-menti
 ### Resources
 
 - [ESP8266 web server](https://randomnerdtutorials.com/esp8266-nodemcu-access-point-ap-web-server/)
+- [Interrupts](https://randomnerdtutorials.com/interrupts-timers-esp8266-arduino-ide-nodemcu/)
 
 ### Libraries
 
