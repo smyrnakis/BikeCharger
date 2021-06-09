@@ -28,17 +28,20 @@ char access_SSID[] = ACCESS_POINT_SSID;
 char access_PASS[] = ACCESS_POINT_PASS;
 
 
-const unsigned long interval_LED                        = 1000;
+// const unsigned long interval_LED                        = 1000;
 const unsigned long interval_DHT11                      = 5000;
-const unsigned long interval_DataCalculator             = 500;
+const unsigned long interval_dataPrint                  = 1000;
+// const unsigned long interval_DataCalculator             = 500;
 const unsigned long interval_ThingSpeakUpload           = 15000;
 
 const unsigned long debounce_min_between_revolution     = 150;
 const unsigned long delay_operational_after_revolution  = 2000;
+const unsigned long delay_reset_data_after_finish       = 15000;
 
 unsigned long time_lastDataCalculated   = 0;
 unsigned long time_preLastRevolution    = 0;
 unsigned long time_lastRevolution       = 0;
+unsigned long time_lastDataPrint        = 0;
 unsigned long time_lastLEDblink         = 0;
 unsigned long time_lastUpload           = 0;
 unsigned long time_lastDHT11            = 0;
@@ -51,6 +54,7 @@ float humidity;
 float temperature;
 
 bool underOperation                     = false;
+bool rideDuration_printed               = true;
 
 
 unsigned long usageSeconds              = 0;
@@ -151,24 +155,11 @@ ICACHE_RAM_ATTR void revolution() {                         // interrupt handler
 }
 
 
-void get_sensorData() {
-    temperature = dht.readTemperature();
-    humidity = dht.readHumidity();
-
-    // Serial.print("Temperature: ");
-    // Serial.print(String(temperature));
-    // Serial.println(" °C");
-    // Serial.print("Humidity: ");
-    // Serial.print(String(humidity));
-    // Serial.println(" %");
+void print_data() {
 
     Serial.print("\nrevolutionDurationMS: ");
     Serial.print(revolutionDurationMS);
-    Serial.println(" MS");
-
-    Serial.print("usageSeconds: ");
-    Serial.print(usageSeconds);
-    Serial.println(" sec");
+    Serial.println(" ms");
 
     Serial.print("rpm: ");
     Serial.print(rpm);
@@ -186,7 +177,54 @@ void get_sensorData() {
     Serial.print(distanceTravelled);
     Serial.println(" m");
 
-    lastTEMPevent = millis();
+    time_lastDataPrint = millis();
+}
+
+
+void reset_Data() {
+    rpm                     = 0;
+    usageSeconds            = 0;
+    bicycleSpeed            = 0;
+    energyProduced          = 0;
+    rideRevolutions         = 0;
+    distanceTravelled       = 0;
+
+    startTime               = 0;
+    stopTime                = 0;
+    revolutionDurationMS    = 0;
+
+    underOperation          = false;
+}
+
+
+void read_DHT11() {
+    temperature = dht.readTemperature();
+    humidity = dht.readHumidity();
+
+    // Serial.print("\nTemperature: ");
+    // Serial.print(String(temperature));
+    // Serial.println(" °C");
+    // Serial.print("Humidity: ");
+    // Serial.print(String(humidity));
+    // Serial.println(" %\n");
+
+    time_lastDHT11 = millis();
+}
+
+
+void serial_sendData() {
+    digitalWrite(PCBLED, LOW);
+    String data_packet = String(temperature);
+    data_packet += "&";
+    data_packet += String(humidity);
+    data_packet += "&";
+
+    data_packet += "\r\n";
+
+    Serial_internet_relay.print(data_packet);
+
+    digitalWrite(PCBLED, HIGH);
+    time_lastUpload = millis();
 }
 
 
@@ -232,34 +270,53 @@ void setup() {
 
 
 void loop() {
+    // Handler for WiFi connections
     server.handleClient();
 
+    // Read temperature & humidity every 5" (interval_DHT11)
+    if (millis() > time_lastDHT11 + interval_DHT11) {
+        read_DHT11();
+    }
+
+    // If last revolution was more than 2" (delay_operational_after_revolution) before, ride is over
     if ((millis() > time_lastRevolution + delay_operational_after_revolution) && underOperation) {
         underOperation = false;
         stopTime = millis();
-        // Serial.println("[DEB] underOperation=false");
     }
 
     if (underOperation) {
-
-        // digitalWrite(PCBLED, LOW);
         digitalWrite(ROAD_LED, LOW);
-    }
-    else {
-        // more stuff
-        // digitalWrite(PCBLED, HIGH);
-        digitalWrite(ROAD_LED, HIGH);
-    }
-
-    if (underOperation) {
         usageSeconds = 0;
+
+        // Print calculated data every 1" (interval_dataPrint) when user is riding
+        if (millis() > time_lastDataPrint + interval_dataPrint) {
+            print_data();
+        }
+
+        // flag for printing ride duration (sec) after ride is over
+        rideDuration_printed = false;
+
+        // send data to ThingSpeak (2nd Arduino - internet_relay) every 15" (interval_ThingSpeakUpload)
+        if (millis() > time_lastUpload + interval_ThingSpeakUpload) {
+            serial_sendData();
+        }
     }
     else {
-        usageSeconds = (stopTime - startTime) / 1000;
-    }
+        digitalWrite(ROAD_LED, HIGH);
 
-    if (millis() > lastTEMPevent + interval_lastTEMPevent) {
-        get_sensorData();
+        // Calculate and print ride duration (sec) after ride is over
+        usageSeconds = (stopTime - startTime) / 1000;
+        if (!rideDuration_printed && (startTime != 0)) {
+            Serial.print("Ride duration: ");
+            Serial.print(usageSeconds);
+            Serial.println(" sec");
+            rideDuration_printed = true;
+        }
+
+        // Reset all counters 15" (delay_reset_data_after_finish) after ride is over
+        if (millis() > stopTime + delay_reset_data_after_finish) {
+            reset_Data();
+        }
     }
 }
 
@@ -495,7 +552,7 @@ String HTML_NOT_FOUND() {
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ web pages ~~~~~~~~~~~~~~~~~~~~~~~
 void onConnect_default() {
     digitalWrite(ESPLED, LOW);
-    get_sensorData();
+    // print_data();
     server.send(200, "text/html", HTML_LANDING_PAGE());
     digitalWrite(ESPLED, HIGH);
 }
