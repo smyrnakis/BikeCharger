@@ -43,6 +43,17 @@ When a user wants to operate the bicycle, they should connect on the above-menti
 
 <br>
 
+### Notes
+
+#### Wattage
+Average cyclist produce approximately **310 watts in 7.5 minutes** [[source](https://bestsportslounge.com/watts-produced-cycling)].
+
+Calculate Watt/revolution
+- 310 W  /  7.5 min  =  41.3 W/min
+- average RPM = 90
+- 41.3 W/min  /  90 rpm  =  0.46 W/revolution
+
+
 ## internet_relay
 
 

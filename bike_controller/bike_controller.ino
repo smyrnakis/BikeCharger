@@ -48,7 +48,7 @@ unsigned long time_lastDHT11            = 0;
 
 
 const int wheel_radius                  = 34;       // in CM
-const float kWh_per_revolution          = 0.05;
+const float watt_per_revolution         = 0.46;
 
 float humidity;
 float temperature;
@@ -99,7 +99,7 @@ float kilometers_per_hour(int rpm, float circumferenceCM) {
 }
 
 
-int usage_seconds(unsigned long startMILLIS, unsigned long stopMILLIS) {
+unsigned long usage_seconds(unsigned long startMILLIS, unsigned long stopMILLIS) {
     return (stopMILLIS - startMILLIS) / 1000;
 }
 
@@ -121,9 +121,9 @@ float distance_travelled_M(unsigned long totalRev, float circumferenceCM) {     
 }
 
 
-float energy_produced_KWH(int rpm, float kwhPerRpm) {
-    // kwh = rpm * kWh/rpm (constant)
-    return rpm * kwhPerRpm;
+float energy_produced_WATT(int rpm, float wattPerRpm) {
+    // wh = rpm * W/rpm (constant)
+    return rpm * wattPerRpm;
 }
 
 
@@ -149,7 +149,7 @@ ICACHE_RAM_ATTR void revolution() {                         // interrupt handler
 
         rpm                     = revolutions_per_minute_RPM(revolutionDurationMS);
         bicycleSpeed            = kilometers_per_hour(rpm, circumference_CM(wheel_radius));
-        energyProduced          = energy_produced_KWH(rpm, kWh_per_revolution);
+        energyProduced          = energy_produced_WATT(rpm, watt_per_revolution);
         distanceTravelled       = distance_travelled_M(rideRevolutions, circumference_CM(wheel_radius));
     }
 }
@@ -171,7 +171,7 @@ void print_data() {
 
     Serial.print("energyProduced: ");
     Serial.print(energyProduced);
-    Serial.println(" kWh");
+    Serial.println(" W");
 
     Serial.print("distanceTravelled: ");
     Serial.print(distanceTravelled);
@@ -296,7 +296,7 @@ void loop() {
         // flag for printing ride duration (sec) after ride is over
         rideDuration_printed = false;
 
-        // send data to ThingSpeak (2nd Arduino - internet_relay) every 15" (interval_ThingSpeakUpload)
+        // Send data to ThingSpeak (2nd Arduino - internet_relay) every 15" (interval_ThingSpeakUpload)
         if (millis() > time_lastUpload + interval_ThingSpeakUpload) {
             serial_sendData();
         }
@@ -305,7 +305,7 @@ void loop() {
         digitalWrite(ROAD_LED, HIGH);
 
         // Calculate and print ride duration (sec) after ride is over
-        usageSeconds = (stopTime - startTime) / 1000;
+        usageSeconds = usage_seconds(startTime, stopTime);
         if (!rideDuration_printed && (startTime != 0)) {
             Serial.print("Ride duration: ");
             Serial.print(usageSeconds);
@@ -318,6 +318,7 @@ void loop() {
             reset_Data();
         }
     }
+    delay(5);
 }
 
 
