@@ -24,7 +24,7 @@ char apiKeyThingSpeak[] = THINGSP_WR_APIKEY;
 
 char serialDataDelimiter[] = "&";
 // char sz[] = "temp;humidity;weight";
-char * receivedData[3];
+char * receivedData[7];
 // int arrayIndex;
 
 const unsigned long interval_LED = 1000;
@@ -37,6 +37,7 @@ SoftwareSerial Serial_bike(RX_PIN, TX_PIN);
 
 
 // WebClient and HTTPS requests handler
+WiFiClient clientHttp;
 WiFiClientSecure clientHttps;
 HTTPClient remoteClient;
 
@@ -50,30 +51,40 @@ int call_thingSpeak() {
     thinkSpeakAPIurl += "/update?api_key=";
     thinkSpeakAPIurl += (String)apiKeyThingSpeak;
     // if (!isnan(receivedData[0])) {
-        thinkSpeakAPIurl +="&field1=";
-        thinkSpeakAPIurl += receivedData[0];
+    thinkSpeakAPIurl += "&field1=";
+    thinkSpeakAPIurl += (String)receivedData[0];
     // }
     // if (!isnan(receivedData[1])) {
-        thinkSpeakAPIurl +="&field2=";
-        thinkSpeakAPIurl += receivedData[1];
+    thinkSpeakAPIurl += "&field2=";
+    thinkSpeakAPIurl += (String)receivedData[1];
     // }
+    thinkSpeakAPIurl += "&field3=";
+    thinkSpeakAPIurl += (String)receivedData[2];
+    thinkSpeakAPIurl += "&field4=";
+    thinkSpeakAPIurl += (String)receivedData[3];
+    thinkSpeakAPIurl += "&field5=";
+    thinkSpeakAPIurl += (String)receivedData[4];
+    thinkSpeakAPIurl += "&field6=";
+    thinkSpeakAPIurl += (String)receivedData[5];
+    thinkSpeakAPIurl += "&field7=";
+    thinkSpeakAPIurl += (String)receivedData[6];
 
     clientHttps.setInsecure();
     clientHttps.connect("https://api.thingspeak.com", 443);
     remoteClient.begin(clientHttps, thinkSpeakAPIurl);
 
     int httpCode = remoteClient.GET();
-    // String payload = remoteClient.getString();
+    String payload = remoteClient.getString();
 
-    // if (httpCode == 200) {
-    //     Serial.println("[SUCCESS] contacting ThingSpeak");
-    // }
-    // else {
-    //     Serial.print("[DEB] ThingSpeak response ");
-    //     Serial.print(String(httpCode));
-    //     Serial.print(" | ");
-    //     Serial.println(String(payload));
-    // }
+    if (httpCode == 200) {
+        Serial.println("[SUCCESS] contacting ThingSpeak");
+    }
+    else {
+        Serial.print("[DEB] ThingSpeak response ");
+        Serial.print(String(httpCode));
+        Serial.print(" | ");
+        Serial.println(String(payload));
+    }
 
     digitalWrite(ESPLED, HIGH);
     return httpCode;
@@ -162,17 +173,59 @@ void loop() {
                 int returnCodeThingSpeak;
                 returnCodeThingSpeak = call_thingSpeak();
 
-                Serial.print("[DEB] ThingSpeak return code: ");
-                Serial.println(returnCodeThingSpeak);
-                Serial_bike.print("[DEB] ThingSpeak return code: ");
-                Serial_bike.println("returnCodeThingSpeak");
+                // Serial.print("[DEB] ThingSpeak return code: ");
+                // Serial.println(returnCodeThingSpeak);
+                // Serial_bike.print("[DEB] ThingSpeak return code: ");
+                // Serial_bike.println(returnCodeThingSpeak);
             }
         }
     }
 
 
-    // listen for incoming Serial Data (from USB) and forward it to Software Serial (bike_controller)
-    if ( Serial.available() ) {
-        Serial_bike.write( Serial.read() );
+    // Read incoming Serial Data
+    if (Serial.available()) {
+
+        String incomingSerialData;
+
+        while (Serial.available()) {
+
+            incomingSerialData = Serial.readStringUntil('\r\n');
+
+            // if ((String(incomingSerialData)).indexOf('&') > 0) {
+            if ((String(incomingSerialData)).indexOf(serialDataDelimiter) > 0) {
+
+                // Convert from String Object to String
+                // char buffer[sizeof(sz)];
+                char buffer[incomingSerialData.length() + 1];
+                incomingSerialData.toCharArray(buffer, sizeof(buffer));
+
+                char * p = buffer;
+                char * extractedItem;
+                short arrayIndex = 0;
+
+                // while ((extractedItem = strtok_r(p, "&", & p)) != NULL) {
+                while ((extractedItem = strtok_r(p, serialDataDelimiter, & p)) != NULL) {
+                    receivedData[arrayIndex] = extractedItem;
+                    ++arrayIndex;
+                }
+
+                Serial.println("[SUCCESS] receiving sensor data from 'computer'");
+                Serial_bike.println("[SUCCESS] receiving sensor data from 'computer'");
+
+
+                int returnCodeThingSpeak;
+                returnCodeThingSpeak = call_thingSpeak();
+
+                // Serial.print("[DEB] ThingSpeak return code: ");
+                // Serial.println(returnCodeThingSpeak);
+                // Serial_bike.print("[DEB] ThingSpeak return code: ");
+                // Serial_bike.println(returnCodeThingSpeak);
+            }
+        }
     }
+
+    // // listen for incoming Serial Data (from USB) and forward it to Software Serial (bike_controller)
+    // if ( Serial.available() ) {
+    //     Serial_bike.write( Serial.read() );
+    // }
 }
