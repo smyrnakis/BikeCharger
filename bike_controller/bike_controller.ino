@@ -28,6 +28,7 @@ char access_SSID[] = ACCESS_POINT_SSID;
 char access_PASS[] = ACCESS_POINT_PASS;
 
 
+const unsigned long interval_LED                        = 1000;
 const unsigned long interval_DHT11                      = 5000;
 const unsigned long interval_dataPrint                  = 1000;
 const unsigned long interval_ThingSpeakUpload           = 15000;
@@ -40,7 +41,7 @@ const unsigned long delay_reset_data_after_finish       = 15000;
 unsigned long time_preLastRevolution    = 0;
 unsigned long time_lastRevolution       = 0;
 unsigned long time_lastDataPrint        = 0;
-// unsigned long time_lastLEDblink         = 0;
+unsigned long time_lastLEDblink         = 0;
 unsigned long time_lastUpload           = 0;
 unsigned long time_lastDHT11            = 0;
 
@@ -240,7 +241,7 @@ void read_DHT11() {
 
 
 void serial_sendData() {
-    digitalWrite(PCBLED, LOW);
+    digitalWrite(ESPLED, LOW);
     String data_packet = String(temperature);
     data_packet += "&";
     data_packet += String(humidity);
@@ -262,7 +263,7 @@ void serial_sendData() {
 
     Serial_internet_relay.print(data_packet);
 
-    digitalWrite(PCBLED, HIGH);
+    digitalWrite(ESPLED, HIGH);
     time_lastUpload = millis();
 }
 
@@ -355,6 +356,12 @@ void setup() {
 void loop() {
     // Handler for WiFi connections
     server.handleClient();
+
+    // Blink LED every 1" (interval_LED)
+    if (millis() > time_lastLEDblink + interval_LED) {
+        digitalWrite(PCBLED, !digitalRead(PCBLED));
+        time_lastLEDblink = millis();
+    }
 
     // Read temperature & humidity every 5" (interval_DHT11)
     if (millis() > time_lastDHT11 + interval_DHT11) {

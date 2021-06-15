@@ -23,9 +23,7 @@ char apiKeyThingSpeak[] = THINGSP_WR_APIKEY;
 
 
 char serialDataDelimiter[] = "&";
-// char sz[] = "temp;humidity;weight";
 char * receivedData[7];
-// int arrayIndex;
 
 const unsigned long interval_LED = 1000;
 
@@ -148,11 +146,9 @@ void loop() {
 
             incomingSerialData = Serial_bike.readStringUntil('\r\n');
 
-            // if ((String(incomingSerialData)).indexOf('&') > 0) {
             if ((String(incomingSerialData)).indexOf(serialDataDelimiter) > 0) {
 
                 // Convert from String Object to String
-                // char buffer[sizeof(sz)];
                 char buffer[incomingSerialData.length() + 1];
                 incomingSerialData.toCharArray(buffer, sizeof(buffer));
 
@@ -160,7 +156,6 @@ void loop() {
                 char * extractedItem;
                 short arrayIndex = 0;
 
-                // while ((extractedItem = strtok_r(p, "&", & p)) != NULL) {
                 while ((extractedItem = strtok_r(p, serialDataDelimiter, & p)) != NULL) {
                     receivedData[arrayIndex] = extractedItem;
                     ++arrayIndex;
@@ -195,7 +190,6 @@ void loop() {
             if ((String(incomingSerialData)).indexOf(serialDataDelimiter) > 0) {
 
                 // Convert from String Object to String
-                // char buffer[sizeof(sz)];
                 char buffer[incomingSerialData.length() + 1];
                 incomingSerialData.toCharArray(buffer, sizeof(buffer));
 
@@ -203,7 +197,6 @@ void loop() {
                 char * extractedItem;
                 short arrayIndex = 0;
 
-                // while ((extractedItem = strtok_r(p, "&", & p)) != NULL) {
                 while ((extractedItem = strtok_r(p, serialDataDelimiter, & p)) != NULL) {
                     receivedData[arrayIndex] = extractedItem;
                     ++arrayIndex;
