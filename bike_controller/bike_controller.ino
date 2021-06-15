@@ -59,7 +59,7 @@ bool rideDuration_printed               = true;
 
 unsigned long usageSeconds              = 0;
 int rpm                                 = 0;
-int bicycleSpeed                        = 0;        // average (total distance / usage time) OR momentary (rpm to kpm)
+int bicycleSpeed                        = 0;        // average (total distance / usage time) OR momentary (rpm to kph)
 float energyProduced                    = 0.0;
 int energyInstantaneous                 = 0;
 int distanceTravelled                   = 0;        // we need total rpm per ride
@@ -95,7 +95,7 @@ int revolutions_per_minute_RPM(float revDurationMS) {
 
 
 float kilometers_per_hour(int rpm, float circumferenceCM) {
-    // kpm = rpm * circumference(cm) * 60(min) / 100000(cm/km)
+    // kph = rpm * circumference(cm) * 60(min) / 100000(cm/km)
     return circumferenceCM * rpm * 60.0 / 100000.0;
 }
 
@@ -270,7 +270,7 @@ void serial_sendData() {
 
 ICACHE_RAM_ATTR void revolution() {                         // interrupt handler
 
-    // IF last revolution was more than 'delay_operational_after_revolution' (2.5") time ago
+    // IF last revolution was more than 'delay_operational_after_revolution' (2") time ago
     // AND currently is NOT under operation THEN --> consider NOW as 'startTime'
     if ((millis() > time_lastRevolution + delay_operational_after_revolution) && !underOperation) {
 
@@ -278,7 +278,7 @@ ICACHE_RAM_ATTR void revolution() {                         // interrupt handler
         startTime = millis();
     }
 
-    // Debounce reed sensor (revolutions can not happen closer than 100ms between each other)
+    // Debounce reed sensor (revolutions can not happen closer than 150ms between each other)
     if (millis() > time_lastRevolution + debounce_min_between_revolution) {
         underOperation = true;
         rideRevolutions += 1;
