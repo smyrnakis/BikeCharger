@@ -50,6 +50,8 @@ The above are calculated in the *interrupt function* `ICACHE_RAM_ATTR void revol
 
 As long as the bike is **under operation** *(check next chapter - "Limitations")*, then the data is calculated and sent via the Software Serial `Serial_internet_relay` to the 2nd Arduino *(internet_relay)*.
 
+Fifteen seconds after the end of the ride, the data is reset.
+
 <br>
 
 ### Limitations
@@ -61,7 +63,7 @@ Additionally, if there's no revolution for **2"** it considers the bicycle as *n
 
 For a **34 cm** radius wheel (*circumference* of **213 cm**), the minimum / maximum *RPM* and *KPH* are:
 
-| | RPM | KPM |
+| | RPM | KPH |
 |:---:|:---:|:---:|
 |MIN|30|3.8|
 |MAX|400|51.1|
@@ -72,7 +74,7 @@ For a **34 cm** radius wheel (*circumference* of **213 cm**), the minimum / maxi
 
 To keep track of time, the `millis()` function is used. This function returns the *current millisecond* since the Arduino was powered up.
 
-It is of `unsigned long` type, thus it can reach up to **4,294,967,295 milliseconds** which is approximately **49 days, 17 hours and 2 minutes** (or 7.1 weeks).
+It is of `unsigned long` type, thus it can reach up to **4,294,967,295 milliseconds** which is approximately **49 days, 17 hours and 2 minutes** (7.1 weeks).
 
 <br>
 
@@ -98,9 +100,10 @@ From the duration of every revolution, we can calculate the **revolutions per mi
 
 Knowing the RPM and the circumference, we can calculate the **speed** in kilometres per hour (KPH):
 
-    KPH = rpm * C * 60 / 100000
+    KPH = C * rpm * 60 / 100000
     
     C       : circumference in CM
+    rpm     : revolutions per minute
     60      : minutes (to calculate for an hour)
     100000  : centimetres in a kilometre
 
@@ -175,6 +178,7 @@ The expected order of incoming data is the following:
 On serial data reception, after striping the String and assigning its value to an array cell, the function `int call_thingSpeak()` is called. This function will upload the data to the [ThingSpeak](https://thingspeak.com/channels/1408003) using a `GET` request.
 
 The URL for the above mentioned String example will be:
+
 `https://api.thingspeak.com/update?api_key=XXXXXXXXXX&field1=28&field2=37&field3=1&field4=25&field5=243&field6=120`
 
 The `API_KEY` is stored in the file `secrets.h` with the name "`THINGSP_WR_APIKEY`".
@@ -186,11 +190,13 @@ The `API_KEY` is stored in the file `secrets.h` with the name "`THINGSP_WR_APIKE
 
 The Arduino needs a working WiFi in order to upload data. If there is no WiFi connection, in will reboot every 5 seconds.
 
-Communication between the two Arduinos ("bike_controller" and "internet_relay") is not bidirectional. In the unlike event that data upload to ThingSpeak fails, the "bike_controller" will not be notified.
+Communication between the two Arduinos *("bike_controller" and "internet_relay")* is not bidirectional. In the unlike event that data upload to ThingSpeak fails, the "bike_controller" will not be notified.
 
 <br>
 
 * * *
+
+<br>
 
 ## Functions, Libraries and Resources
 
