@@ -387,13 +387,6 @@ void loop() {
 
         // flag for printing ride duration (sec) after ride is over
         rideDuration_printed = false;
-
-        // Send data to ThingSpeak (2nd Arduino - internet_relay) every 15" (interval_ThingSpeakUpload)
-        if (millis() > time_lastUpload + interval_ThingSpeakUpload) {
-            if (allowThingSpeak) {
-                serial_sendData();
-            }
-        }
     }
     else {
         digitalWrite(ROAD_LED, HIGH);
@@ -412,6 +405,13 @@ void loop() {
         // Reset all counters 15" (delay_reset_data_after_finish) after ride is over
         if (millis() > stopTime + delay_reset_data_after_finish) {
             reset_Data();
+        }
+    }
+
+    // Send data to ThingSpeak (2nd Arduino - internet_relay) every 15" (interval_ThingSpeakUpload)
+    if (millis() > time_lastUpload + interval_ThingSpeakUpload) {
+        if (allowThingSpeak) {
+            serial_sendData();
         }
     }
 
