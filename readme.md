@@ -147,11 +147,46 @@ Based on ESP8266. The microcontroller is using the following I/Os:
 
 ### Operation
 
-    uploaded to [ThingSpeak](https://thingspeak.com/channels/1408003) every 15 seconds.
+On startup, the ESP8266 creates a local hotspot with the following details:
+
+| SSID | PASSWORD |
+|:---:|:---:|
+|BikeCharger_online|letsbike|
+
+The administrator needs to connect on this hotspot and using the on-screen guidance, connect the Arduino to an available WiFi network.
+
+When everything is OK, the PCB LED is blinking with a period of 1 second.
+
+The ESP8266 is waiting for serial data to become available (either on the USB serial port or on the Software Serial `Serial_bike` which connects the two Arduinos together).
+
+When data is available, the incoming String is split using the "`&`" character as a delimiter.
+
+The expected order of incoming data is the following:
+- `temperature` - the ambient temperature in °C
+- `humidity` - the ambient humidity in %
+- `underOperation` - 0/1 (active ride or bike not used)
+- `bicycleSpeed` - speed in kilometres per hour
+- `distanceTravelled` - ride's distance in meters
+- `usageSeconds` - ride's duration in seconds
+- `energyInstantaneous` - current energy production in Watt
+
+**NOTE:** the incoming string must end with the "`&`" character. Example: "`28&37&1&25&243&120&65&`".
+
+On serial data reception, after striping the String and assigning its value to an array cell, the function `int call_thingSpeak()` is called. This function will upload the data to the [ThingSpeak](https://thingspeak.com/channels/1408003) using a `GET` request.
+
+The URL for the above mentioned String example will be:
+`https://api.thingspeak.com/update?api_key=XXXXXXXXXX&field1=28&field2=37&field3=1&field4=25&field5=243&field6=120`
+
+The `API_KEY` is stored in the file `secrets.h` with the name "`THINGSP_WR_APIKEY`".
+
 
 <br>
 
 ### Limitations
+
+The Arduino needs a working WiFi in order to upload data. If there is no WiFi connection, in will reboot every 5 seconds.
+
+Communication between the two Arduinos ("bike_controller" and "internet_relay") is not bidirectional. In the unlike event that data upload to ThingSpeak fails, the "bike_controller" will not be notified.
 
 <br>
 
