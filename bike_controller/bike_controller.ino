@@ -293,6 +293,7 @@ ICACHE_RAM_ATTR void revolution() {                         // interrupt handler
     rpm                     = revolutions_per_minute_RPM(revolutionDurationMS);
     bicycleSpeed            = kilometers_per_hour(rpm, circumference_CM(wheel_radius));
     energyInstantaneous     = energy_current_WATT(rpm, watt_per_revolution);
+    energyProduced          += energyInstantaneous;
     distanceTravelled       = distance_travelled_M(rideRevolutions, circumference_CM(wheel_radius));
 
     // Calculate ongoing ride's duration
