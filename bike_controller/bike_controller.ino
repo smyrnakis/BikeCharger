@@ -34,7 +34,7 @@ const unsigned long interval_dataPrint                  = 1000;
 const unsigned long interval_ThingSpeakUpload           = 15000;
 
 const unsigned long debounce_min_between_revolution     = 150;
-const unsigned long delay_operational_after_revolution  = 2000;
+const unsigned long delay_operational_after_revolution  = 5000;
 const unsigned long delay_reset_data_after_finish       = 15000;
 
 // unsigned long time_lastDataCalculated   = 0;
@@ -60,7 +60,7 @@ bool rideDuration_printed               = true;
 unsigned long usageSeconds              = 0;
 int rpm                                 = 0;
 int bicycleSpeed                        = 0;        // average (total distance / usage time) OR momentary (rpm to kph)
-float energyProduced                    = 0.0;
+unsigned long energyProduced            = 0;
 int energyInstantaneous                 = 0;
 int distanceTravelled                   = 0;        // we need total rpm per ride
 unsigned long rideRevolutions           = 0;
@@ -194,9 +194,9 @@ void print_data() {
     Serial.print(energyInstantaneous);
     Serial.println(" W");
 
-    // Serial.print("energyProduced: ");
-    // Serial.print(energyProduced);
-    // Serial.println(" Wh");
+    Serial.print("energyProduced: ");
+    Serial.print(energyProduced);
+    Serial.println(" W");
 
     Serial.print("distanceTravelled: ");
     Serial.print(distanceTravelled);
@@ -211,7 +211,7 @@ void reset_Data() {
     usageSeconds            = 0;
     bicycleSpeed            = 0;
     energyInstantaneous     = 0;
-    // energyProduced          = 0;
+    energyProduced          = 0;
     rideRevolutions         = 0;
     distanceTravelled       = 0;
 
@@ -516,12 +516,12 @@ String HTML_LANDING_PAGE() {
     html_page += " Watt</td>";
     html_page += "</tr>\n";
 
-    // html_page += "<tr>\n";
-    // html_page += "<td>Energy (ride):</td>";
-    // html_page += "<td style=\"padding-left: 10px;\">";
-    // html_page += (String)energyProduced;
-    // html_page += " Watt</td>";
-    // html_page += "</tr>\n";
+    html_page += "<tr>\n";
+    html_page += "<td>Energy (ride):</td>";
+    html_page += "<td style=\"padding-left: 10px;\">";
+    html_page += (String)energyProduced;
+    html_page += " Watt</td>";
+    html_page += "</tr>\n";
 
     html_page += "</table>\n";
 
